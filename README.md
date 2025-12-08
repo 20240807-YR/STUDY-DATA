@@ -247,13 +247,75 @@ Agent 10을 “실제 마케팅/CRM 팀이 바로 써보고 싶어지는 도구�
 ### 12_04_올영하이브리드.ipynb — 리뷰·감성 지표를 포함한 고도화 모델 및 할인 전략 지표
 
 * **리뷰·감성 지표를 포함한 고도화 모델 및 할인 전략 지표** 
-    * 상품 DF에 리뷰 통계를 병합해 `n_reviews`, `avg_review_score`, `avg_sentiment` 피처를 추가하고, 리뷰 50개 이상 보유 상품만 모은 `df_model_hr`를 구성했습니다.
-    * 피처: `price_num`, `orig_price_num`, `discount_rate`, `n_reviews`, `avg_review_score`, `avg_sentiment`
-	* 타깃: `rank` 로 `XGBRegressor`를 다시 학습해 리뷰 정보가 순위 예측에 주는 영향(feature importance)까지 확인했습니다.
-	* 각 상품에 대해 할인율을 +10% 올렸을 때 예측 순위가 얼마나 개선되는지 계산하는 `discount_sensitivity` 변수를 만들고, 0~1 사이로 정규화한 `popularity_boost_score`를 정의했습니다.
-	* `기존 가성비 점수(value_score)`와 결합해 `hybrid_score = value_score * (1 + popularity_boost_score)`를 만들고, 할인했을 때 인기 상승 여지가 크면서도 현재 가성비가 좋은 상품을
-TOP 30 리스트로 추려냈습니다.
-	* 브랜드별 평균 `hybrid_score`를 계산해 **“가격/할인/리뷰/할인 민감도까지 합친 종합 가치가 높은 브랜드 TOP 30”**을 가로 막대 그래프로 시각화했습니다.
+    * 상품 DF에 리뷰 통계를 병합해 `n_reviews`, `avg_review_score`, `avg_sentiment` 
+	피처를 추가하고, 리뷰 50개 이상 보유 상품만 모은 `df_model_hr`를 구성했습니다.
+    * 피처: `price_num`, `orig_price_num`, `discount_rate`, `n_reviews`, 
+	`avg_review_score`, `avg_sentiment`
+	* 타깃: `rank` 로 `XGBRegressor`를 다시 학습해 리뷰 정보가 순위 예측에 주는 영향
+	(feature importance)까지 확인했습니다.
+	* 각 상품에 대해 할인율을 +10% 올렸을 때 예측 순위가 얼마나 개선되는지 계산하는 
+	`discount_sensitivity` 변수를 만들고, 0~1 사이로 정규화한 `popularity_boost_score`
+	를 정의했습니다.
+	* `기존 가성비 점수(value_score)`와 결합해 `hybrid_score = value_score * (1 + 
+	popularity_boost_score)`를 만들고, 할인했을 때 인기 상승 여지가 크면서도 현재 가성비가 좋
+	은 상품을 TOP 30 리스트로 추려냈습니다.
+	* 브랜드별 평균 `hybrid_score`를 계산해 **“가격/할인/리뷰/할인 민감도까지 합친 종합 가치가 높
+	은 브랜드 TOP 30”**을 가로 막대 그래프로 시각화했습니다.
+ 
+⸻
 
+### 12_05_초기.ipynb — 데이터 컬럼 점검·시장 페르소나 스코어링·하이브리드 추천 엔진 v0
+* **columns 확인** 
+    * `올영_세일.csv`, `네이버뷰티검색기록.csv`, `올영_베스트.csv`, `올영_세일_리뷰추가.csv`, `올영_세일파이널.csv`, `올영_핫딜.csv`, `인구데이터성별.csv`, `인구통계.csv`, `GRDP시도별.csv`를 순차적으로 `pd.read_csv()` 후 `df.columns` 출력해서 주요 컬럼 구조를 확인했습니다.
 
+* **초기 페르소나 점수 계산 코드(v0)** 
+    * 여러 CSV(베스트, 세일, 세일_리뷰추가, 핫딜, 인구데이터성별)를 불러와 `clean_number() /
+	to_num()` 함수로 가격·평점·리뷰 수를 숫자형으로 정리했습니다.
+    * `Clean Ingredient` / `Emotional` / `Value / `Premium / `Functional` / `Routine` / `Simplicity` / `Trend Responsiveness` 7개 스코어를 계산해 `persona_scores` 딕셔너리와 `persona_df`로 정리, `barh` 그래프로 시각화했습니다.
+    * 주석으로 각 스코어(예: `Value Sensitivity Score ≈ 0.29`, `Premium Orientation
+	Score ≈ 0.5`, `Trend Responsiveness Score`가 매우 낮은 이유 등) 해석 메모 작성했습니다.
+
+* **페르소나 스코어 정규화 및 해석**
+	* `persona_df`에서 `score` 컬럼을 `Min–Max` 정규화해 `normalized_score` 추가.
+ 	* 정규화 결과를 기반으로 
+	`Premium = 1.0`, `Functional = 1.0`, `Routine Simplicity ≈ 0.67`, `Value ≈ 0.59`,`Trend ≈ 0.05`, `Clean & Emotional = 0.0` 등 시장 `baseline` 성향을 텍스트로 정리했습니다.
+	
+* **XGBoost 기반 하이브리드 스코어 계산**
+	* `올영_세일.csv`에서 `price_num`, `orig_price_num`, `discount_rate`, `rank` 생성 후 `XGBRegressor(300 trees, learning_rate=0.05, max_depth=4 등)`로 `rank` 예측 모델 학습했습니다.
+ 	* 전체 상품에 대해 `pred_rank`, `popularity_score = 1` / `(pred_rank + 1),
+value_score = popularity_score / (price_num + 1)` 계산했습니다.
+	* `compute_discount_sensitivity()` 함수로 할인율 +10% 가정 시 순위 개선량을 시뮬레이션 → `discount_sensitivity → popularity_boost_score` 정규화 →
+최종 `hybrid_score = value_score * (1 + popularity_boost_score)` 계산했습니다.
+ 	* 상품명에서 첫 단어로 `brand`를 추출하고 브랜드별 평균 `hybrid_score` 집계 후 TOP 30 가로 막대 시각화했습니다.
+
+* **시장 baseline 기반 persona_df 재계산 + persona 엔진 v1**
+	* `df`에 `hybrid_score`, `discount_rate`, `brand`, `popularity_boost_score`가 존재하는 상태를 가정하고, 없을 경우를 대비한 보정 코드 포함했습니다.
+ 	* 외부 데이터(올영_베스트, 올영_세일_리뷰추가, 올영_핫딜, 인구데이터성별)를 다시 불러와
+`Clean` / `Emotional` / `Value` / `Premium` / `Functional` / `Routine` `Simplicity` / `Trend` 스코어를 재계산하고 `Min–Max` 정규화 → `persona_df`, `persona_scores.`
+	* `premium_brands` = ["설화수", "헤라"], `value_brands` = ["라네즈", "이니스프리"],`clean_brands` = ["닥터지", "일리윤", "라로슈포제"], f`unctional_brands` = ["닥터지", "메디힐", "피지오겔"]를 정의했습니다.
+
+* **persona_affinity + final_reco_score 기반 추천 점수**
+	*` compute_persona_affinity() / compute_affinity()` 함수에서
+브랜드군, `discount_rate`, `popularity_boost_scor`e와 `persona_scores`를 조합해 `persona_affinity` 계산했습니다.
+ 	* `hybrid_score_norm`, `persona_affinity_norm`으로 정규화 후
+`final_reco_score = 0.6 * hybrid_score_norm + 0.4 * persona_affinity_norm` 정의했습니다.
+	* `final_reco_score` 기준 TOP 20 및 TOP 3 상품을 정렬해 출력하고,
+`format_item()`으로 “이름·가격·할인율·URL” 형식의 텍스트 블록 생성했습니다.
+
+* **persona_affinity + final_reco_score 기반 추천 점수**
+	* `microsoft/Phi-3-mini-4k-instruct`를 `transformers`로 로드하고,
+`llm_generate(prompt)` 래퍼 함수를 정의해 추천 결과와 페르소나 설명을 LLM 프롬프트로 넘길 준비했습니다.
+
+⸻
+
+### 12_06_아모레.ipynb — 아모레퍼시픽(라네즈) 베스트셀러 크롤링
+* **라네즈 베스트셀러 페이지 크롤링** 
+    * `requests + BeautifulSoup`으로 아모레몰 라네즈 베스트셀러 페이지 HTML을 요청했습니다.
+    * `div.productCard.shop-productCard.typeSmall` 요소를 기준으로 상품 카드 리스트를 수집했습니다.
+    * 각 상품에서 `.name -> 상품명`, `.price -> 가격`, `.discount -> 할인율`, `.review -> 평점`을 추출하여 `rows` 리스트에 저장했습니다. 
+
+* **CSV 저장** 
+    * 아모레몰에 있는 전체 브랜드의 csv 파일을 생성했습니다.
+    * 헤더는 ["상품명", "가격", "할인율", "평점"]으로 구성했습니다.
+    * `UTF-8-SIG`로 저장하여 엑셀·한글에서 깨지지 않도록 처리했습니다.
 
