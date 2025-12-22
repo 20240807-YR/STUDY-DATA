@@ -1,0 +1,179 @@
+import pandas as pd
+import numpy as np
+import os  # 파일 존재 여부 확인
+from kiwipiepy import Kiwi
+from sklearn.feature_extraction.text import TfidfVectorizer
+from transformers import pipeline
+
+# --- 분석기 클래스 (기존과 동일) ---
+class TextAnalyzer:
+    def __init__(self):
+        print(">>> [1/2] 형태소 분석기(Kiwi) 로딩 중...")
+        try:
+            self.kiwi = Kiwi(num_workers=1)
+        except Exception:
+            self.kiwi = Kiwi()
+        
+        print(">>> [2/2] AI 톤 분석 모델(Zero-Shot) 로딩 중...")
+        self.classifier = pipeline(
+            "zero-shot-classification", 
+            model="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+            device=-1 
+        )
+        print(">>> 초기화 완료! 분석을 시작합니다.\n")
+
+    def analyze_style_pattern(self, text):
+        tokens = self.kiwi.tokenize(text)
+        metrics = {'adjectives': 0, 'verbs': 0, 'formal_ending': 0}
+        
+        for token in tokens:
+            if token.tag.startswith('VA'): 
+                metrics['adjectives'] += 1
+            elif token.tag.startswith('VV'): 
+                metrics['verbs'] += 1
+            if token.tag.startswith('EF') and any(x in token.form for x in ['니다', '니까', '십시오']):
+                metrics['formal_ending'] = 1
+        return metrics
+
+    def predict_tone(self, text, labels):
+        target_text = text[:512] 
+        result = self.classifier(target_text, labels, multi_label=False)
+        return result['labels'][0], result['scores'][0]
+
+    def generate_report(self, documents, tone_labels):
+        def tokenizer(text):
+            tokens = self.kiwi.tokenize(text)
+            return [t.form for t in tokens if t.tag.startswith('NN')]
+
+        vectorizer = TfidfVectorizer(tokenizer=tokenizer, min_df=1)
+        tfidf_matrix = vectorizer.fit_transform(documents)
+        feature_names = np.array(vectorizer.get_feature_names_out())
+
+        results = []
+        for idx, doc in enumerate(documents):
+            feature_index = tfidf_matrix[idx, :].nonzero()[1]
+            tfidf_scores = zip(feature_index, [tfidf_matrix[idx, x] for x in feature_index])
+            sorted_scores = sorted(tfidf_scores, key=lambda x: x[1], reverse=True)
+            top_keywords = [feature_names[i] for i, score in sorted_scores[:5]]
+
+            style = self.analyze_style_pattern(doc)
+            tone, score = self.predict_tone(doc, tone_labels)
+
+            results.append({
+                "구분": f"Part {idx+1}",
+                "내용 요약": doc.strip()[:30].replace("\n", " ") + "...",
+                "핵심 키워드": ", ".join(top_keywords),
+                "AI 분석 톤": tone,
+                "확신도": f"{score:.2f}",
+                "형용사 수": style['adjectives'],
+            })
+        
+        return pd.DataFrame(results)
+
+# --- 실행부 (데이터 원문 100% 반영) ---
+if __name__ == "__main__":
+    
+    # ==========================================
+    # 1. 설정: 브랜드 이름 변경
+    # ==========================================
+    current_brand_name = "오설록"
+
+    # 2. 데이터 입력 (보내주신 텍스트 전체 포함)
+    
+    # Part 1: 브랜드 소개 및 제주의 자연 환경 (원문 앞부분)
+    full_text_part1 = """
+    Tea from Jeju Island
+    “어느 나라를 가도 나라마다 독특한 차가 하나씩은 있는데 우리나라는 없다. 어떤 희생을 치르더라도 우리의 전통 차문화를 정립하고 싶다.” - 아모레퍼시픽 창업자 故 서성환 회장
+    우리나라에 사라진 차 문화를 새롭게 꽃 피우겠다는 오설록의 아름다운 집념은 돌과 바람이 전부였던 버려진 땅 제주의 자연을 이해하고 극복하며 45여 년간 푸른 꿈을 꾸며 일구어 왔습니다. 최고의 차를 향한 끊임없는 연구와 정성으로 제주의 차밭, 차 문화의 깊이를 직접 체험할 수 있는 제주 티뮤지엄과 도심 속 티하우스 그리고 최고 품질의 차로 결실을 이루었습니다.
+    오설록은 한국을 대표하는 럭셔리 차 브랜드로서 일상 속 여유를 되찾고 각자의 취향 있는 티라이프를 재발견할 수 있도록 끊임없이 노력하고 있습니다.
+    TEA FROM JEJU
+    대한민국이 가진 천혜의 자연 유산 제주, 화산섬 제주가 가진 경이로운 생명력으로 오설록의 차는 탄생합니다. 
+    해발 1,950m, 화산섬에 우뚝 솟은 한라산은 중산간에 급격한 온도차를 만들어 독특한 구름대와 안개를 형성합니다. 사방의 바다로 생성된 해무 발생일수도 연평균 25일에 달해, 자연이 빚은 차광재인 안개가 최적의 그늘을 선사합니다. 
+    제주의 흙은 전 세계적으로도 손꼽히는 공극률로 물과 공기의 흐름을 원활하게 하고 일반 토양보다 10배나 높은 유기물을 함유하고 있습니다. 다공성 제주 현무암의 미세한 틈은 차나무를 건강하게 유지하여 제주차만의 차이를 만들어 냅니다
+    천연 필터 역할을 하는 화산 토양으로 더욱 깨끗한 제주 암반수는 차 나무가 건강하게 자라기 위한 더없이 좋은 자연의 선물입니다
+    거친 제주의 바람이지만 실은 차 재배에는 더 없이 소중한 제주의 바람입니다. 남쪽의 먼 바다에서 연평균 초속 4~7m의 거센 바람이 불어와 뿌리의 수분 흡수를 증가시켜 차의 향기를 짙게 만들고, 찻잎의 불순물을 씻어내는 에어워셔의 효과로 제주 차만의 특별함을 더합니다
+    제주 차밭은 화산섬이 만든 완만한 지형의 고저로 인해 식물 에너지의 근원인 태양을 한껏 끌어안습니다. 사계절 내내 쏟아지는 따뜻한 빛은 연 평균 기온을 14~16°C로 유지해 차가 건강하게 자랄 수 있는 온도를 제공합니다
+    """
+
+    # Part 2: 차밭 소개 및 특징 (원문 중간 부분)
+    full_text_part2 = """
+    오설록의 제주 차밭
+    약 100만 평에 달하는 3개의 오설록 유기농 차밭은 화산섬의 지역적 기후 환경에 따라 각각의 색과 향, 그리고 맛이 특별한 차를 생산하고 있습니다.
+    유기농/품질관리 인증 정보
+    색이 좋은 서광 차밭
+    산방산 근처의 서광 차밭은 대기가 한라산을 지나며 많은 구름과 안개를
+    형성하고, 이는 자연 차광 효과를 내 찻잎의 색을 좋게 만듭니다. 온화한
+    기후와 자연 차광 효과는 고급 품질의 차를 만들 때 더없이 좋은 생육
+    조건이 됩니다.
+    향이 좋은 돌송이 차밭
+    돌송이 차밭 지역은 예로부터 화산재가 굳어서 돌멩이같이 잘게 부서진
+    화산송이가 많아 ‘돌송이’라고 불리어 왔습니다. 이곳은 산과 바다를
+    동시에 접하고 있어 매년 4월 한라산의 잔설을 품은 산바람과 바다의
+    수분을 머금은 바닷바람이 밤낮으로 불어와 돌송이 차밭에서 채엽한
+    차는 향이 매우 좋습니다.
+    맛이 좋은 한남 차밭
+    과거 ‘해들이밭’이라 하여 마을에서 가장 먼저 해가 드는 곳이라 불렸던
+    한남 차밭은 온화한 기후에서 성장해 차나무가 어리고 아미노산 함량이
+    높아 뛰어난 맛을 선사합니다.
+    오설록의 차가 특별한 이유
+    1979년, 돌과 바람이 전부였던 제주의 땅에서 시작해 최고의 차를 생산하기까지,
+    오설록의 차가 특별한 이유를 만나보세요.
+    """
+
+    # Part 3: 지속가능성 및 미래 가치 (원문 뒷부분)
+    full_text_part3 = """
+    자연을 숨쉬게 하는 차밭
+    자연을 지키는 유기농 차밭
+    Farm to Cup
+    제주 오설록의 유기농 차밭은 연간 11,176 tonCO₂eq/yr1)의 이산화탄소를 흡수합니다. 이는 과수작물 대비 3배 이상의 탄소 축적 효과가 있습니다. 차 나무는 인류에게 건강한 차를 제공하며 동시에 지구의 건강한 환경에도 기여하고 있습니다.
+    1) 2021년 2월, 표본목 광합성 측정 결과에 따름
+    연구 방법: 현지 표본목의 광합성 측정기에 의한 이산화탄소 동화량 측정, 차나무 생산량(수확, 전지, 전정 등에 의해 제거된 생물량을 제외)에 의한 CO2 흡수량 계산
+    오설록은 믿을 수 있는 품질의 차를 생산하기 위해 직접 차 나무를 재배하고 찻잎을 가공하여 차 제품을 고객에게 전달하기까
+    제주를 담은 차
+    제주의 향기를 담다
+    제주와 상생하는 차
+    깊이를 찾는 발효의 기술
+    제주의 자연이 선물한 발효
+    삼나무가 전하는 깊이
+    기술이 만드는 내일의 차
+    오직 차를 위한 연구소
+    해를 가리고 색을 얻다
+    Since 1979
+    차밭을 개간한 집념을 근간으로 차를 재배하고, 가공 발효하여 세계적으로 권위있는 명차 대회에서
+    꾸준히 수상을 이어가며 증명된 오설록의 차는 이제 전 세계의 사람들과 만나고 있습니다.
+    사람, 차를 만나다
+    억척스런 제주 사람의 손조차 한 번도 닿지 않은 채 버려진 세 곳의 땅을
+    제주의 자연을 이해하고 극복하며 한국의 차 문화를 잇기 위해 개간된 제주의 땅은
+    45년이 지난 지금 세계적인 차 산지로 손꼽히는 최고의 차 재배지로 거듭났습니다.
+    다다일상,
+    차와 함께하는 삶
+    차를 마시는 것은 일상의 쉼을 가지며, 나를 이끌어내고 세상을 따뜻하게 바라보는 것에 관한 일입니다.
+    당신이 언제 어디에 있든 차와 함께 삶의 아름다운 여백을 만들어 나가길 바랍니다.
+    """
+
+    documents = [full_text_part1, full_text_part2, full_text_part3]
+    target_tones = ["의학적/전문적인", "신뢰감/진정성있는", "도전적/혁신적인", "감성적/부드러운"]
+    
+    # 3. 분석 실행
+    analyzer = TextAnalyzer()
+    df_result = analyzer.generate_report(documents, target_tones)
+
+    # 4. 브랜드 컬럼 추가 및 정리
+    df_result['브랜드'] = current_brand_name
+    cols = ['브랜드'] + [c for c in df_result.columns if c != '브랜드']
+    df_result = df_result[cols]
+
+    # 5. CSV 파일 누적 저장 (Append 모드)
+    save_file_name = "total_brand_analysis.csv"
+    
+    if os.path.exists(save_file_name):
+        df_result.to_csv(save_file_name, mode='a', index=False, header=False, encoding="utf-8-sig")
+        print(f"\n✅ 기존 '{save_file_name}' 파일 아래에 '{current_brand_name}' 데이터를 추가했습니다.")
+    else:
+        df_result.to_csv(save_file_name, mode='w', index=False, header=True, encoding="utf-8-sig")
+        print(f"\n📂 새 파일 '{save_file_name}'을 생성하고 '{current_brand_name}' 데이터를 저장했습니다.")
+
+    # 터미널 확인용 출력
+    print("="*80)
+    print(df_result)
+    print("="*80)
