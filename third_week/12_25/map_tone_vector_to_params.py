@@ -99,7 +99,7 @@ if __name__ == "__main__":
         analyzer = ToneAnalyzer.from_files(PATH_CENTROIDS, PATH_META)
         
         # 2. 더미 데이터로 테스트
-        dummy_vector = np.random.rand(1536) # 예: embedding size
+        dummy_vector = np.random.rand(768) # 예: embedding size
         result = analyzer.map_tone_vector_to_params(dummy_vector)
         
         print("\n✅ Test Result:")
