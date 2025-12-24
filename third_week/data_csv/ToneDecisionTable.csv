@@ -1,0 +1,9 @@
+brand_tone_cluster,brand_position,message_goal,tone_profile_id,description
+0,고기능/클리니컬,신규,clinical_explain,근거 중심 기능 설명 톤
+0,고기능/클리니컬,구매,clinical_cta,효능 강조 + 명확한 행동 유도
+1,수분 중심,신규,gentle_explain,일상어 기반 피부 공감 톤
+1,수분 중심,재방문,gentle_relationship,관계 중심 부드러운 톤
+2,프리미엄/헤리티지,신규,heritage_story,브랜드 스토리 강조
+2,프리미엄/헤리티지,구매,heritage_value,가치·신뢰 중심 설득
+3,트렌디/컬러,신규,trendy_hook,감각적 후킹 톤
+3,트렌디/컬러,시즌,trendy_event,이벤트·시즌 강조 톤

@@ -1,0 +1,10 @@
+slot,required_fields,optional_fields
+HOOK,brand_position|message_goal,persona_hint
+EMPATHY,persona_skin_state,season_context
+PROOF,key_ingredient|clinical_point,trust_signal
+BENEFIT,benefit_1|benefit_2,benefit_proof
+PRODUCT,brand|product_name,category
+CTA,message_goal,link|store_action
+STORY,brand_story_key,heritage_word
+VALUE,value_claim,quality_signal
+EVENT,event_name|period,urgency_word

@@ -1,0 +1,5 @@
+tone_id,proof_level,emotion_level,cta_strength,sentence_len
+Scientific,high,low,mid,short
+Emotional,low,high,low,mid
+Luxury,mid,mid,mid,short
+Casual,low,mid,high,very_short

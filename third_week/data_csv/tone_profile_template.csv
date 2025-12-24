@@ -1,0 +1,9 @@
+tone_profile_id,slot_order,sentence_len,proof_level,emotion_level,cta_strength,lexicon_hint,ban_hint
+clinical_explain,HOOK>PROOF>BENEFIT>PRODUCT>CTA,short,high,low,mid,"성분/기능/근거","과장/감탄/유행어"
+clinical_cta,HOOK>PROOF>PRODUCT>CTA,short,high,low,high,"효능/검증/핵심요약","장황/감성서사"
+gentle_explain,HOOK>EMPATHY>BENEFIT>PRODUCT>CTA,mid,mid,mid,low,"부드러운일상어/컨디션","단정적명령/전문용어남발"
+gentle_relationship,EMPATHY>PRODUCT>BENEFIT>CTA,mid,low,high,low,"관계어/돌봄/습관","강한구매압박/공포자극"
+heritage_story,HOOK>STORY>PRODUCT>BENEFIT>CTA,mid,mid,mid,mid,"가치/전통/신뢰","할인/자극적표현"
+heritage_value,HOOK>PROOF>VALUE>PRODUCT>CTA,short,high,low,mid,"가치/품질/격","가성비몰이/유행어"
+trendy_hook,HOOK>BENEFIT>PRODUCT>CTA,very_short,low,high,high,"감각/리듬/짧은카피","긴설명/근거장문"
+trendy_event,HOOK>EVENT>PRODUCT>CTA,very_short,low,high,high,"시즌/한정/지금","긴서사/무거운톤"
