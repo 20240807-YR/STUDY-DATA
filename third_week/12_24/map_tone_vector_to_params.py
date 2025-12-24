@@ -4,22 +4,20 @@ import pickle as pkl
 from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ==================================================
-# 경로 설정 (third_week 기준)
-# ==================================================
-BASE_DIR = Path(__file__).resolve().parents[2]   # STUDY-DATA/third_week
-DATA_DIR = BASE_DIR / "data_csv"
+# =========================
+# 경로 설정 (확정)
+# =========================
+BASE_DIR = Path(__file__).resolve().parents[2]   # STUDY-DATA
+DATA_DIR = BASE_DIR / "third_week" / "data_csv"
 
 PATH_CENTROIDS = DATA_DIR / "tone_vectors.pkl"
 PATH_META = DATA_DIR / "tone_metadata_extended.csv"
 
-# ==================================================
-# 데이터 로드 (module import 시 1회)
-# ==================================================
 with open(PATH_CENTROIDS, "rb") as f:
-    tone_centroids: dict[str, np.ndarray] = pkl.load(f)
+    tone_centroids = pkl.load(f)
 
 tone_meta = pd.read_csv(PATH_META).set_index("tone_id")
+
 
 # ==================================================
 # 핵심 함수
