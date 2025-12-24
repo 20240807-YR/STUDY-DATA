@@ -20,7 +20,7 @@ data_dir = current_dir.parent / "data_csv"
 path_centroids = data_dir / "tone_vectors.pkl"
 path_meta = data_dir / "tone_metadata_extended.csv"
 
-# 3. Import (이제 경로가 추가되었으므로 에러 없이 불러옵니다)
+# 3. Import
 try:
     from map_tone_vector_to_params import ToneAnalyzer
     print("✅ 모듈 Import 성공")
@@ -33,7 +33,7 @@ except ImportError as e:
 # [2] Analyzer 초기화 (전역 객체 생성)
 # ==============================================================================
 try:
-    # 여기서 파일을 한 번만 로드합니다.
+    # Analyzer 로드 (이때 pkl 파일도 Gemini 모델로 만들어져 있어야 차원이 맞습니다)
     analyzer = ToneAnalyzer.from_files(path_centroids, path_meta)
     print("✅ ToneAnalyzer 데이터 로드 완료")
 except FileNotFoundError as e:
@@ -86,15 +86,7 @@ def decide_slot_order(params, slot_schema):
     if params.get("cta_strength") != "low":
         order.append("cta")
 
-    # 5. 스키마 기준 정렬 및 중복 제거
-    final_order = []
-    # slot_schema에 있는 순서대로 정렬하되, order에 포함된 것만 남김
-    # (단, 위 로직은 동적 추가된 슬롯이 스키마에 없으면 무시되므로, 
-    #  여기서는 간단히 '사용자가 정의한 스키마 순서'를 우선하되 활성화된 슬롯만 뽑습니다)
-    
-    # *수정 제안*: 위에서 만든 `order`가 동적으로 생성된 순서이므로 이것을 유지하는 것이 맞습니다.
-    # 다만, slot_schema에 없는 엉뚱한 슬롯이 들어가는 걸 방지하려면 아래처럼 합니다.
-    
+    # 5. 스키마 기준 정렬 (중복 제거 및 스키마 검증)
     validated_order = []
     for slot in order:
         if slot in slot_schema and slot not in validated_order:
@@ -107,19 +99,17 @@ def render_slot_sentence(slot, params, product, persona):
     """
     개별 슬롯을 문장으로 렌더링하고, 금칙어/대체어를 적용합니다.
     """
-    # 템플릿 채우기 (데이터는 예시로 하드코딩 되어있으나, 실제론 DB 등에서 가져와야 함)
     base_sentence = SLOT_TEMPLATES.get(slot, "")
     sentence = base_sentence.format(
         persona=persona,
         product=product,
-        proof_point="임상 데이터",      # TODO: 실제 제품 데이터 연동 필요
-        emotion_phrase="편안한 일상"    # TODO: 실제 감성 데이터 연동 필요
+        proof_point="임상 데이터",      # TODO: 실제 데이터 연동 필요
+        emotion_phrase="편안한 일상"    # TODO: 실제 데이터 연동 필요
     )
 
     # Lexicon(어휘) 적용
     lex_group = params.get("lexicon_group")
     if lex_group in LEXICON:
-        # 간단히 괄호로 추가하는 로직 유지
         sentence += f" ({LEXICON[lex_group][0]})"
 
     # Ban Group(금칙어) 필터링
@@ -133,12 +123,9 @@ def render_slot_sentence(slot, params, product, persona):
 
 def generate_message(persona, tone_vector, slot_schema, product):
     """
-    Agent의 메인 진입점입니다.
-    벡터 -> 톤 분석 -> 슬롯 순서 결정 -> 문장 생성 -> 결과 반환
+    Agent의 메인 진입점
     """
-    
-    # 1. 톤 분석 (Class Instance 사용)
-    # 기존 route_tone 함수는 Analyzer 내부에 로직이 포함되었으므로 삭제됨
+    # 1. 톤 분석
     try:
         params = analyzer.map_tone_vector_to_params(tone_vector)
     except Exception as e:
@@ -170,22 +157,69 @@ def generate_message(persona, tone_vector, slot_schema, product):
 
 
 # ==============================================================================
-# [5] 실행 테스트
+# [5] 실행 테스트 (Google Gemini API 적용)
 # ==============================================================================
 if __name__ == "__main__":
-    print("\n🚀 Agent Rule Engine Test Started...")
-    
-    # 테스트용 더미 데이터
-    test_persona = "민지"
-    test_product = "레티놀 세럼"
-    test_schema = ["intro", "proof", "emotion", "cta"]
-    
-    # 임의의 벡터 생성 (실제 환경에선 임베딩 모델 출력값)
-    # 768차원 (googleAI embedding size 예시)
-    dummy_vector = np.random.rand(768)
-
-    # 메시지 생성 호출
-    result = generate_message(test_persona, dummy_vector, test_schema, test_product)
-    
+    import google.generativeai as genai
+    from dotenv import load_dotenv
     import pprint
-    pprint.pprint(result)
+
+    # .env 파일 로드
+    load_dotenv()
+    
+    # 1. API 키 설정 (GOOGLE_API_KEY)
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # 혹은 "GEMINI_API_KEY"
+    
+    if not GOOGLE_API_KEY:
+        print("\n❌ Google API Key가 없습니다. .env 파일을 확인해주세요.")
+    else:
+        # Gemini 설정
+        genai.configure(api_key=GOOGLE_API_KEY)
+        
+        print("\n🚀 Agent Rule Engine Test Started (with Google Gemini)...")
+        
+        # 2. 테스트할 입력 텍스트
+        # (원하는 톤이 나오는지 확인하기 위해 명확한 문장을 입력해보세요)
+        user_input_text = "장인정신이 깃든 최고의 걸작, 시간을 초월한 가치를 선사합니다." 
+        # user_input_text = "임상 실험으로 검증된 99%의 주름 개선 효과를 데이터를 통해 확인하세요."
+        
+        print(f"📄 입력 문장: {user_input_text}")
+
+        try:
+            # 3. 실제 Gemini 임베딩 생성
+            # models/text-embedding-004 모델 사용 (768차원)
+            result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=user_input_text,
+                task_type="retrieval_query"
+            )
+            
+            real_vector = np.array(result['embedding'])
+            print(f"✅ 임베딩 완료 (차원수: {len(real_vector)})")
+
+            # 4. 차원 일치 여부 확인 (중요)
+            # pkl 파일과 현재 API 모델의 차원이 다르면 계산 불가
+            # analyzer.centroids의 첫 번째 값의 차원을 확인
+            if hasattr(analyzer, 'centroids') and len(analyzer.centroids) > 0:
+                first_key = list(analyzer.centroids.keys())[0]
+                pkl_dim = len(analyzer.centroids[first_key])
+                if len(real_vector) != pkl_dim:
+                    print(f"\n⚠️ [경고] 차원 불일치 발생!")
+                    print(f" - PKL 파일 벡터 차원: {pkl_dim}")
+                    print(f" - 현재 API 벡터 차원: {len(real_vector)}")
+                    print(" -> PKL 파일을 다시 만들거나, 모델을 통일해야 합니다.")
+                    sys.exit(1)
+
+            # 5. 메시지 생성 호출
+            test_persona = "민지"
+            test_product = "레티놀 세럼"
+            test_schema = ["intro", "proof", "emotion", "cta"]
+
+            final_result = generate_message(test_persona, real_vector, test_schema, test_product)
+
+            # 6. 결과 출력
+            print("\n[분석 및 생성 결과]")
+            pprint.pprint(final_result)
+
+        except Exception as e:
+            print(f"\n❌ API 호출 또는 실행 중 오류 발생: {e}")

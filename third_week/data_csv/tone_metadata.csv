@@ -1,5 +1,0 @@
-﻿tone_id,keyword_count,keywords,model_used
-Scientific,12,"연구, 데이터, 기술, 특허, 임상, 메커니즘, 효능, 성분, 솔루션, 혁신, 분석, 검증",models/text-embedding-004
-Emotional,12,"사랑, 행복, 마음, 위로, 함께, 추억, 소중한, 느낌, 감동, 선물, 일상, 여유",models/text-embedding-004
-Luxury,10,"프리미엄, 고품격, 가치, 특별한, 최고, 럭셔리, 노블레스, 장인, 헤리티지, 압도적",models/text-embedding-004
-Casual,11,"진짜, 대박, 완전, 가성비, 꿀팁, 그냥, 솔직, 친구, 쉬운, 간편, 추천",models/text-embedding-004
