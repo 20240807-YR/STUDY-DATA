@@ -1,102 +1,86 @@
-# openai_client.py
-# ============================================================
-# OpenAI ChatCompletion Client
-# - 설명 / 전략 해석 전용
-# - 계산 ❌ / 추천 ❌
-# ============================================================
-
+# agent10/openai_client.py
 import os
-from openai import OpenAI
+
+OPENAI_OFFLINE = os.getenv("OPENAI_OFFLINE", "0") == "1"
 
 
 class OpenAIChatCompletionClient:
     """
-    OpenAI ChatCompletion Wrapper
-
-    원칙:
-    - 계산 ❌
-    - 추천 ❌
-    - 점수 생성 ❌
-    - 오직 '설명'과 '전략적 문장화'만 수행
+    - ONLINE : 실제 OpenAI 호출
+    - OFFLINE: MOCK 응답 (구조 테스트용)
     """
 
     def __init__(self, model: str = "gpt-4o-mini"):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError(
-                "OPENAI_API_KEY 환경변수가 설정되지 않았습니다."
-            )
-
-        self.client = OpenAI(api_key=api_key)
         self.model = model
 
-    # --------------------------------------------------------
-    # ReAct Reasoning Agent 전용
-    # --------------------------------------------------------
+        if not OPENAI_OFFLINE:
+            from openai import OpenAI
+
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise RuntimeError("OPENAI_API_KEY 환경변수가 없습니다.")
+
+            self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = None
+
+    # --------------------------------------------------
+    # ReAct Reasoning
+    # --------------------------------------------------
     def explain(self, prompt: str) -> str:
-        """
-        전략 설명 전용 메서드
+        if OPENAI_OFFLINE:
+            return (
+                "[MOCK EXPLANATION]\n"
+                "This CRM strategy explains why the persona–brand fit is valid.\n"
+                "The tone cluster supports consistent emotional framing.\n"
+                "No calculation or recommendation is performed."
+            )
 
-        - CoT(Chain of Thought)는 내부적으로만 사용
-        - 최종 출력은 '설명 텍스트'만 반환
-        """
         try:
-            response = self.client.chat.completions.create(
+            resp = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "You are a CRM strategy analyst.\n"
-                            "Do NOT perform calculations.\n"
-                            "Do NOT make recommendations.\n"
-                            "Only explain the given CRM decision, "
-                            "persona–brand fit, and tone strategy."
+                            "You are a CRM strategy analyst. "
+                            "Do NOT calculate or recommend. "
+                            "Only explain the strategy."
                         )
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
-                temperature=0.3
+                temperature=0.3,
             )
-            return response.choices[0].message.content.strip()
-
+            return resp.choices[0].message.content.strip()
         except Exception as e:
-            raise RuntimeError(f"[OpenAI explain() error] {str(e)}")
+            raise RuntimeError(f"[OpenAI explain() FAILED] {e}")
 
-    # --------------------------------------------------------
-    # Strategy Narrator 전용
-    # --------------------------------------------------------
+    # --------------------------------------------------
+    # Strategy Narration
+    # --------------------------------------------------
     def generate(self, prompt: str) -> str:
-        """
-        CRM 메시지 생성 전용 메서드
+        if OPENAI_OFFLINE:
+            return (
+                "[MOCK MESSAGE]\n"
+                "당신의 라이프스타일과 브랜드 톤에 맞춘 메시지를 전달합니다."
+            )
 
-        - Executor / Narrator에서만 호출
-        - 전략은 이미 주어진 상태에서 문장화만 수행
-        """
         try:
-            response = self.client.chat.completions.create(
+            resp = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "You are a senior marketing copywriter AI.\n"
-                            "Follow the given strategy strictly.\n"
-                            "Do NOT invent strategy or scores.\n"
-                            "Generate CRM messages only."
+                            "You are a senior marketing copywriter. "
+                            "Generate message only."
                         )
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
-                temperature=0.7
+                temperature=0.7,
             )
-            return response.choices[0].message.content.strip()
-
+            return resp.choices[0].message.content.strip()
         except Exception as e:
-            raise RuntimeError(f"[OpenAI generate() error] {str(e)}")
+            raise RuntimeError(f"[OpenAI generate() FAILED] {e}")
